@@ -114,7 +114,7 @@ pub fn render_template(
 }
 
 pub fn render_typst(mut rendered: String) -> Result<String> {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)\$\$.*\$\$").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)\$\$.*?\$\$").unwrap());
 
     while let Some(match_) = REGEX.find(&rendered) {
         // println!("Found match: {:?}", match_);
@@ -143,8 +143,7 @@ pub fn render_typst(mut rendered: String) -> Result<String> {
 
         ensure!(
             output.status.success(),
-            "Failed to render typst: {}",
-            String::from_utf8_lossy(&output.stderr)
+            "Failed to render typst: {output:?}",
         );
 
         let svg = String::from_utf8(output.stdout)?;
