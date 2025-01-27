@@ -1,3 +1,11 @@
+# FORK
+
+This is a fork of getzola/zola that adds support for embedding [Typst](https://github.com/typst/typst) directly into your pages
+
+I know I know, that's a crazy thing to do. Anyway, the implementation is not very robust and has some major limitations*, but you can use it if you want.
+
+*Typst's HTML support is a work-in-progress right now, so I'm using SVG output
+
 # zola (né Gutenberg)
 
 [![Build Status](https://dev.azure.com/getzola/zola/_apis/build/status/getzola.zola?branchName=master)](https://dev.azure.com/getzola/zola/_build/latest?definitionId=1&branchName=master)

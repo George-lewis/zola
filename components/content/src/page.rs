@@ -11,7 +11,7 @@ use errors::{Context, Result};
 use markdown::{render_content, RenderContext};
 use utils::slugs::slugify_paths;
 use utils::table_of_contents::Heading;
-use utils::templates::{render_template, ShortcodeDefinition};
+use utils::templates::{render_template, render_typst, ShortcodeDefinition};
 use utils::types::InsertAnchor;
 
 use crate::file_info::FileInfo;
@@ -107,6 +107,7 @@ impl Page {
             page.file.find_language(&config.default_language, &config.other_languages_codes())?;
 
         page.raw_content = content.to_string();
+
         let (word_count, reading_time) = get_reading_analytics(&page.raw_content);
         page.word_count = Some(word_count);
         page.reading_time = Some(reading_time);

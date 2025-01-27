@@ -1,8 +1,16 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::Write,
+    process::{Command, Stdio},
+    sync::LazyLock,
+};
 
-use libs::tera::{Context, Tera};
+use libs::{
+    regex::Regex,
+    tera::{Context, Tera},
+};
 
-use errors::{bail, Result};
+use errors::{bail, ensure, Result};
 
 static DEFAULT_TPL: &str = include_str!("default_tpl.html");
 
@@ -79,25 +87,73 @@ pub fn render_template(
     context: Context,
     theme: &Option<String>,
 ) -> Result<String> {
-    if let Some(template) = check_template_fallbacks(name, tera, theme) {
-        return tera.render(template, &context).map_err(std::convert::Into::into);
+    let rendered = if let Some(template) = check_template_fallbacks(name, tera, theme) {
+        tera.render(template, &context)?
+    } else {
+        // maybe it's a default one?
+        let x: Result<String> = match name {
+            "index.html" | "section.html" => render_default_tpl!(
+                name,
+                "https://www.getzola.org/documentation/templates/pages-sections/#section-variables"
+            ),
+            "page.html" => render_default_tpl!(
+                name,
+                "https://www.getzola.org/documentation/templates/pages-sections/#page-variables"
+            ),
+            "single.html" | "list.html" => render_default_tpl!(
+                name,
+                "https://www.getzola.org/documentation/templates/taxonomies/"
+            ),
+            _ => bail!("Tried to render `{}` but the template wasn't found", name),
+        };
+
+        x?
+    };
+
+    Ok(rendered)
+}
+
+pub fn render_typst(mut rendered: String) -> Result<String> {
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)\$\$.*\$\$").unwrap());
+
+    while let Some(match_) = REGEX.find(&rendered) {
+        // println!("Found match: {:?}", match_);
+
+        let process = Command::new("typst")
+            .arg("c")
+            .args(["-f", "svg"])
+            .arg("-")
+            .arg("-")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        process.stdin.as_ref().unwrap().write_all(
+            match_
+                .as_str()
+                .strip_prefix("$$")
+                .unwrap()
+                .strip_suffix("$$")
+                .unwrap()
+                .trim()
+                .as_bytes(),
+        )?;
+
+        let output = process.wait_with_output()?;
+
+        ensure!(
+            output.status.success(),
+            "Failed to render typst: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let svg = String::from_utf8(output.stdout)?;
+
+        rendered
+            .replace_range(match_.range(), &format!(r#"<div class="typst-document">{svg}</div>"#));
     }
 
-    // maybe it's a default one?
-    match name {
-        "index.html" | "section.html" => render_default_tpl!(
-            name,
-            "https://www.getzola.org/documentation/templates/pages-sections/#section-variables"
-        ),
-        "page.html" => render_default_tpl!(
-            name,
-            "https://www.getzola.org/documentation/templates/pages-sections/#page-variables"
-        ),
-        "single.html" | "list.html" => {
-            render_default_tpl!(name, "https://www.getzola.org/documentation/templates/taxonomies/")
-        }
-        _ => bail!("Tried to render `{}` but the template wasn't found", name),
-    }
+    Ok(rendered)
 }
 
 /// Rewrites the path of duplicate templates to include the complete theme path

@@ -9,6 +9,7 @@ use libs::pulldown_cmark as cmark;
 use libs::pulldown_cmark_escape as cmark_escape;
 use libs::tera;
 use utils::net::is_external_link;
+use utils::templates::render_typst;
 
 use crate::context::RenderContext;
 use errors::{Context, Error, Result};
@@ -402,6 +403,11 @@ pub fn markdown_to_html(
     context: &RenderContext,
     html_shortcodes: Vec<Shortcode>,
 ) -> Result<Rendered> {
+    let content = content.to_string();
+    // println!("---\ncontent: {}", content);
+    let content = render_typst(content)?;
+    // println!("---\nxcontent: {}\n---", content);
+
     let path = context
         .tera_context
         .get("page")
@@ -505,7 +511,7 @@ pub fn markdown_to_html(
         }
 
         let mut accumulated_block = String::new();
-        for (event, mut range) in Parser::new_ext(content, opts).into_offset_iter() {
+        for (event, mut range) in Parser::new_ext(&content, opts).into_offset_iter() {
             match event {
                 Event::Text(text) => {
                     if let Some(ref mut _code_block) = code_block {
