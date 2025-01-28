@@ -115,11 +115,13 @@ pub fn render_template(
 
 pub fn render_typst(mut rendered: String) -> Result<String> {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?s)\$\$.*?\$\$").unwrap());
+    static TYPST: LazyLock<String> =
+        LazyLock::new(|| std::env::var("TYPST_BINARY").unwrap_or_else(|_| "typst".to_string()));
 
     while let Some(match_) = REGEX.find(&rendered) {
         // println!("Found match: {:?}", match_);
 
-        let process = Command::new("typst")
+        let process = Command::new(&*TYPST)
             .arg("c")
             .args(["-f", "svg"])
             .arg("-")
@@ -141,15 +143,21 @@ pub fn render_typst(mut rendered: String) -> Result<String> {
 
         let output = process.wait_with_output()?;
 
-        ensure!(
-            output.status.success(),
-            "Failed to render typst: {output:?}",
-        );
+        if output.status.success() {
+            let svg = String::from_utf8(output.stdout)?;
+            rendered.replace_range(
+                match_.range(),
+                &format!(r#"<div class="typst-document">{svg}</div>"#),
+            );
+        } else {
+            rendered.replace_range(
+                match_.range(),
+                &format!(
+                    r#"<div style="font-size: 50pt; color: red;">failed to render</div>"#
+                ),
+            );
+        }
 
-        let svg = String::from_utf8(output.stdout)?;
-
-        rendered
-            .replace_range(match_.range(), &format!(r#"<div class="typst-document">{svg}</div>"#));
     }
 
     Ok(rendered)
